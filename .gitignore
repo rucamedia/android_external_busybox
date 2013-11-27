@@ -21,6 +21,7 @@ Config.in
 /busybox
 /busybox_old
 /busybox_unstripped*
+/include-xposed/
 
 #
 # Backups / patches

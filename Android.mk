@@ -2,8 +2,13 @@ LOCAL_PATH := $(call my-dir)
 BB_PATH := $(LOCAL_PATH)
 
 # Bionic Branches Switches (GB/ICS/L)
-BIONIC_ICS := false
-BIONIC_L := true
+ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 21)))
+  BIONIC_ICS := false
+  BIONIC_L := true
+else
+  BIONIC_ICS := true
+  BIONIC_L := false
+endif
 
 # Make a static library for regex.
 include $(CLEAR_VARS)
@@ -56,6 +61,16 @@ $(busybox_prepare_minimal): $(BB_PATH)/busybox-minimal.config
 	@echo -e ${CL_YLW}"Prepare config for libbusybox"${CL_RST}
 	@rm -rf $(bb_gen)/minimal
 	@rm -f $(shell find $(abspath $(call intermediates-dir-for,STATIC_LIBRARIES,libbusybox)) -name "*.o")
+	@mkdir -p $(@D)
+	@cat $^ > $@ && echo "CONFIG_CROSS_COMPILER_PREFIX=\"$(BUSYBOX_CROSS_COMPILER_PREFIX)\"" >> $@
+	+make -C $(BB_PATH) prepare O=$(@D) $(BB_PREPARE_FLAGS)
+
+busybox_prepare_xposed := $(bb_gen)/xposed/.config
+$(busybox_prepare_xposed): $(BB_PATH)/busybox-xposed.config
+	@echo -e ${CL_YLW}"Prepare config for busybox-xposed binary"${CL_RST}
+	@rm -rf $(bb_gen)/xposed
+	@rm -f $(shell find $(abspath $(call intermediates-dir-for,EXECUTABLES,busybox-xposed)) -name "*.o")
+	@rm -f $(shell find $(abspath $(call intermediates-dir-for,EXECUTABLES,busybox-xposed-static)) -name "*.o")
 	@mkdir -p $(@D)
 	@cat $^ > $@ && echo "CONFIG_CROSS_COMPILER_PREFIX=\"$(BUSYBOX_CROSS_COMPILER_PREFIX)\"" >> $@
 	+make -C $(BB_PATH) prepare O=$(@D) $(BB_PREPARE_FLAGS)
@@ -186,12 +201,12 @@ ALL_MODULES.$(LOCAL_MODULE).INSTALLED := \
 LOCAL_PATH := $(BB_PATH)
 include $(CLEAR_VARS)
 
-BUSYBOX_CONFIG:=full
-BUSYBOX_SUFFIX:=static
+BUSYBOX_CONFIG:=xposed
 LOCAL_SRC_FILES := $(BUSYBOX_SRC_FILES)
-LOCAL_C_INCLUDES := $(bb_gen)/full/include $(BUSYBOX_C_INCLUDES)
+LOCAL_C_INCLUDES := $(bb_gen)/xposed/include $(BUSYBOX_C_INCLUDES)
 LOCAL_CFLAGS := $(BUSYBOX_CFLAGS)
 LOCAL_CFLAGS += \
+  -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION) \
   -Dgetusershell=busybox_getusershell \
   -Dsetusershell=busybox_setusershell \
   -Dendusershell=busybox_endusershell \
@@ -199,13 +214,20 @@ LOCAL_CFLAGS += \
   -Dgetmntent_r=busybox_getmntent_r \
   -Dgenerate_uuid=busybox_generate_uuid
 LOCAL_ASFLAGS := $(BUSYBOX_AFLAGS)
-LOCAL_FORCE_STATIC_EXECUTABLE := true
-LOCAL_MODULE := static_busybox
-LOCAL_MODULE_STEM := busybox
+LOCAL_MODULE := xposed_busybox
 LOCAL_MODULE_TAGS := optional
-LOCAL_STATIC_LIBRARIES := libclearsilverregex libc libcutils libm libuclibcrpc libselinux
+LOCAL_STATIC_LIBRARIES := libclearsilverregex libselinux
+ifeq ($(XPOSED_BUILD_STATIC),true)
+  LOCAL_MODULE_STEM := busybox-xposed-static
+  BUSYBOX_SUFFIX:=static
+  LOCAL_FORCE_STATIC_EXECUTABLE := true
+  LOCAL_STATIC_LIBRARIES += libc libcutils
+else
+  LOCAL_MODULE_STEM := busybox-xposed
+  LOCAL_SHARED_LIBRARIES := libc libcutils
+endif
 LOCAL_MODULE_CLASS := UTILITY_EXECUTABLES
 LOCAL_MODULE_PATH := $(PRODUCT_OUT)/utilities
 LOCAL_UNSTRIPPED_PATH := $(PRODUCT_OUT)/symbols/utilities
-LOCAL_ADDITIONAL_DEPENDENCIES := $(busybox_prepare_full)
+LOCAL_ADDITIONAL_DEPENDENCIES := $(busybox_prepare_xposed)
 include $(BUILD_EXECUTABLE)
