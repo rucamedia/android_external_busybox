@@ -207,6 +207,7 @@ LOCAL_C_INCLUDES := $(bb_gen)/xposed/include $(BUSYBOX_C_INCLUDES)
 LOCAL_CFLAGS := $(BUSYBOX_CFLAGS)
 LOCAL_CFLAGS += \
   -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION) \
+  -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 \
   -Dgetusershell=busybox_getusershell \
   -Dsetusershell=busybox_setusershell \
   -Dendusershell=busybox_endusershell \
