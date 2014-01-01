@@ -148,12 +148,10 @@ int halt_main(int argc UNUSED_PARAM, char **argv)
 		break;
 	case 2:
 		//reboot
-		#ifdef CYANOGEN_LIBREBOOT
 		if (argc > 1) {
 			mode[1] = strdup(argv[1]);
 			c = 2;
 		}
-		#endif
 		break;
 	}
 	return reboot_main(c, mode);
