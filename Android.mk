@@ -208,6 +208,7 @@ LOCAL_CFLAGS := $(BUSYBOX_CFLAGS)
 LOCAL_CFLAGS += \
   -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION) \
   -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 \
+  -fno-builtin-stpcpy \
   -Dgetusershell=busybox_getusershell \
   -Dsetusershell=busybox_setusershell \
   -Dendusershell=busybox_endusershell \
