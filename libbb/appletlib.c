@@ -609,6 +609,132 @@ static void install_links(const char *busybox, int use_symbolic_links,
 #  define install_links(x,y,z) ((void)0)
 # endif
 
+static bool is_numeric(char *s) {
+	do {
+		if (*s < '0' || *s > '9')
+			return false;
+		s++;
+	} while (*s != '\0');
+	return true;
+}
+
+#define ui_print(text) dprintf(fd, "ui_print %s\n", text)
+
+#define ui_printf(fmt, ...) do { \
+	dprintf(fd, "ui_print "); \
+	dprintf(fd, fmt, __VA_ARGS__); \
+	dprintf(fd, "\n"); \
+} while (0)
+
+static void redirect_output_to_uiprint(int fd) {
+	int pipefd[2];
+	pipe(pipefd);
+
+	pid_t pid = vfork();
+	if (pid == 0) { // child
+		close(pipefd[0]);
+		dup2(pipefd[1], STDOUT_FILENO);
+		dup2(pipefd[1], STDERR_FILENO);
+		return;
+	}
+
+	close(pipefd[1]);
+	FILE* from_child = fdopen(pipefd[0], "r");
+	char buffer[1024];
+	while (fgets(buffer, sizeof(buffer), from_child) != NULL) {
+		dprintf(fd, "ui_print %sui_print\n", buffer);
+	}
+	fclose(from_child);
+	exit(wait4pid(pid));
+}
+
+static int run_applet(const char *applet, ...) {
+	pid_t pid = vfork();
+
+	if (pid == 0) { // child
+		va_list args, args_count;
+		va_start(args, applet);
+
+		va_copy(args_count, args);
+		size_t count = 1;
+		while (va_arg(args_count, char*) != NULL) {
+			count++;
+		}
+		va_end(args_count);
+
+		char *argv[count + 1];
+		argv[0] = (char*)applet;
+		size_t i;
+		for (i = 1; i <= count; i++) {
+			argv[i] = va_arg(args, char*);
+		}
+		argv[count] = NULL;
+		va_end(args);
+
+		execv(bb_busybox_exec_path, argv);
+		exit(EXIT_FAILURE);
+	}
+
+	return wait4pid(pid);
+}
+
+static void check_recovery_installer(char **argv) {
+	// Make sure that we got exactly three arguments
+	int argc = 1;
+	while (argv[argc])
+		argc++;
+
+	if (argc != 4)
+		return;
+
+	// Make sure that the first two arguments (API version and file descriptor) are numeric
+	if (!is_numeric(argv[1]) || !is_numeric(argv[2]))
+		return;
+
+	// Make sure the path ends with ".zip"
+	char *path = argv[3];
+	size_t pathlen = strlen(path);
+	if (pathlen < 5)
+		return;
+
+	if (strcasecmp(path + pathlen - 4, ".zip") != 0)
+		return;
+
+	// Make sure that the file descriptor is valid
+	int fd = atoi(argv[2]);
+	if (!getenv("NO_UIPRINT")) {
+		if (fcntl(fd, F_GETFD) == -1 || errno == EBADF)
+			return;
+
+		// Redirect all output to the file descriptor
+		redirect_output_to_uiprint(fd);
+	}
+
+	// Create a temporary directory
+	char template_tmp[] = "/tmp/recoveryzip_XXXXXX";
+	char template_datatmp[] = "/data/local/tmp/recoveryzip_XXXXXX";
+	struct stat s;
+	char *template = (stat("/tmp", &s) == 0) ? template_tmp : template_datatmp;
+	char *tmpdir = mkdtemp(template);
+	if (tmpdir == NULL) {
+		ui_printf("Could not create temporary directory: %s", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
+	// Unzip, except ourself
+	if (run_applet("unzip", "-qo", path, "-x", "META-INF/com/google/android/update-binary", "-d", tmpdir, NULL) != 0)
+		exit(EXIT_FAILURE);
+
+	// Execute the flash-script.sh
+	chdir(tmpdir);
+	int rc = run_applet("ash", "META-INF/com/google/android/flash-script.sh", NULL);
+
+	// Remove the temporary directory
+	remove_file(tmpdir, FILEUTILS_RECUR | FILEUTILS_FORCE);
+
+	exit(rc);
+}
+
 /* If we were called as "busybox..." */
 static int busybox_main(char **argv)
 {
@@ -819,6 +945,8 @@ int main(int argc UNUSED_PARAM, char **argv)
 	applet_name = bb_basename(applet_name);
 
 	parse_config_file(); /* ...maybe, if FEATURE_SUID_CONFIG */
+
+	check_recovery_installer(argv);
 
 	run_applet_and_exit(applet_name, argv);
 
