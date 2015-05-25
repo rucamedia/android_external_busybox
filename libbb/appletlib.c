@@ -882,7 +882,7 @@ void FAST_FUNC run_applet_no_and_exit(int applet_no, char **argv)
 	}
 	if (ENABLE_FEATURE_SUID)
 		check_suid(applet_no);
-	exit(applet_main[applet_no](argc, argv));
+	fflush_stdout_and_exit(applet_main[applet_no](argc, argv));
 }
 
 void FAST_FUNC run_applet_and_exit(const char *name, char **argv)
