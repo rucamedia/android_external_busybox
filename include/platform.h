@@ -461,6 +461,9 @@ typedef unsigned smalluint;
 # ifndef BIONIC_L
 #  undef HAVE_STPCPY
 # endif
+# if PLATFORM_SDK_VERSION < 18
+#  undef HAVE_GETLINE
+# endif
 #endif
 
 /*
