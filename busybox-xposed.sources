@@ -1,3 +1,5 @@
+archival/bbunzip.c
+archival/gzip.c
 archival/unzip.c
 archival/libarchive/decompress_bunzip2.c
 archival/libarchive/decompress_gunzip.c
@@ -85,6 +87,7 @@ libbb/platform.c
 libbb/printable_string.c
 libbb/process_escape_sequence.c
 libbb/procps.c
+libbb/ptr_to_globals.c
 libbb/read.c
 libbb/read_printf.c
 libbb/recursive_action.c
