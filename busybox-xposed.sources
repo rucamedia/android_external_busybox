@@ -43,6 +43,7 @@ coreutils/libcoreutils/cp_mv_stat.c
 e2fsprogs/chattr.c
 e2fsprogs/e2fs_lib.c
 
+findutils/find.c
 findutils/grep.c
 
 init/halt.c
